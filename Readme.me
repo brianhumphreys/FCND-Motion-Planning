@@ -1,0 +1,62 @@
+### Rubric Guildlines
+
+#Explain the Starter Code
+In the backyard_planner.py, the way points are manually calculated on a 2D axis and used to guide
+the drone in a square and then land.  In the motion_planning.py, the goal location is inputted
+in a (longitude, latitude, altitude) format and the 2D representation is calculated with 
+referrence to the grid cells that were extracted from the collider.csv file.
+
+#Read in the coordinates of the maps center and set as home_position
+The following was executed with the code:
+'''
+filename = 'colliders.csv'=
+with open(filename) as f:
+    first_line = f.readline()
+    lat, lon = parse_text(first_line)
+global_home = (lon, lat, 0)
+self.set_home_position(lon, lat, 0)
+'''
+
+#Make the current position the start position
+In order to make the current position the start position, we must first obtain the current 
+global position that is updated by the call back.  This value must then be converted into 
+easting and northing coordinates using global_to_local()
+'''
+global_position = self.global_position
+local_position = global_to_local(global_position, global_home)
+'''
+
+#Change start from being harcoded to the current position
+To make the local_position corrospond with the grid as a starting point, we must account for
+the offsets as such:
+'''
+grid_start = (-north_offset + int(local_position[1]), -east_offset + int(local_position[0]))
+'''
+
+#set the goal location
+the goal location use to be set as a location 10 cells east and 10 cells north.  Creating a 
+goal locationis done just as with converting the start location.  The geodetic 
+coordinates are chosen at random and are converted to easting and northing using global_to_local()
+'''
+checkpoint = [(-122.400765, 37.796095, TARGET_ALTITUDE), (global_home[0], global_home[1], TARGET_ALTITUDE)]
+    for global_goal in checkpoint:
+        grid_goal = global_to_local(global_goal, global_home)
+        grid_goal = (-north_offset + int(grid_goal[1]), -east_offset + int(grid_goal[0]))
+'''
+As before, the grid coordinates must take into account the easting and northing offsets so we 
+add those values.
+
+#A_star Implementation
+As requested, the minimum requirements of diagonal actions have been implemented.  The costs 
+were assigned sqrt(2).  In order to properly code this, when the NORTH actions were removed 
+from the valid_actions list, so did NORTHWEST and NORTHEAST.  Like wise, if EAST was removed,
+the NORTHEAST and SOUTHEAST had to be removed.  This was done for all four directions, which 
+be seen in the planning_utils.py file.
+
+#Path Pruning
+I also used colinearity to remove colinear waypoints and I used bresenham to remove the 
+middle of three non-colinear waypoints where the connection of the two outer waypoints would
+result in no collisions.  This implementation can be found in the prune_path() function in 
+the planning_utils.py file.  The collinear and bresenham waypoint removals are done simultanously.
+
+

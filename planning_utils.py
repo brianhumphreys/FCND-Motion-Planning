@@ -1,6 +1,7 @@
 from enum import Enum
 from queue import PriorityQueue
 import numpy as np
+from bresenham import bresenham
 
 
 def create_grid(data, drone_altitude, safety_distance):
@@ -55,6 +56,11 @@ class Action(Enum):
     EAST = (0, 1, 1)
     NORTH = (-1, 0, 1)
     SOUTH = (1, 0, 1)
+    
+    NORTHWEST = (-1, -1, np.sqrt(2))
+    NORTHEAST = (-1, 1, np.sqrt(2))
+    SOUTHWEST = (1, -1, np.sqrt(2))
+    SOUTHEAST = (1, 1, np.sqrt(2))
 
     @property
     def cost(self):
@@ -78,12 +84,32 @@ def valid_actions(grid, current_node):
 
     if x - 1 < 0 or grid[x - 1, y] == 1:
         valid_actions.remove(Action.NORTH)
+        
+        if Action.NORTHEAST in valid_actions:
+            valid_actions.remove(Action.NORTHWEST)
+        if Action.NORTHWEST in valid_actions:
+            valid_actions.remove(Action.NORTHWEST)
     if x + 1 > n or grid[x + 1, y] == 1:
         valid_actions.remove(Action.SOUTH)
+        
+        if Action.SOUTHEAST in valid_actions:
+            valid_actions.remove(Action.SOUTHEAST)
+        if Action.SOUTHWEST in valid_actions:
+            valid_actions.remove(Action.SOUTHWEST)
     if y - 1 < 0 or grid[x, y - 1] == 1:
         valid_actions.remove(Action.WEST)
+        
+        if Action.NORTHWEST in valid_actions:
+            valid_actions.remove(Action.NORTHWEST)
+        if Action.SOUTHWEST in valid_actions:
+            valid_actions.remove(Action.SOUTHWEST)
     if y + 1 > m or grid[x, y + 1] == 1:
         valid_actions.remove(Action.EAST)
+        
+        if Action.SOUTHEAST in valid_actions:
+            valid_actions.remove(Action.SOUTHEAST)
+        if Action.NORTHEAST in valid_actions:
+            valid_actions.remove(Action.NORTHEAST)
 
     return valid_actions
 
@@ -143,4 +169,115 @@ def a_star(grid, h, start, goal):
 
 def heuristic(position, goal_position):
     return np.linalg.norm(np.array(position) - np.array(goal_position))
+
+def attraction(position, goal, alpha):
+    # TODO: implement attraction
+    ax_force = -alpha * (position[0] - goal[0])
+    ay_force = -alpha * (position[1] - goal[1])
+    return [ax_force, ay_force]
+
+def repulsion(position, obstacle, beta, q_max):
+    # TODO: implement replusion force
+    rx_force = beta * ((1/q_max) - (1/(position[0] - obstacle[0]))) * (1/pow(position[0] - obstacle[0],2))
+    ry_force = beta * ((1/q_max) - (1/(position[1] - obstacle[1]))) * (1/pow(position[1] - obstacle[1],2))
+    return [rx_force, ry_force]
+
+
+def potential_field(grid, goal, alpha, beta, q_max):
+    x = []
+    y = []
+    fx = []
+    fy = []
+
+    obs_i, obs_j = np.where(grid == 1)
+
+    for i in range(grid.shape[0]):
+        for j in range(grid.shape[1]):
+            if grid[i, j] == 0:
+
+                # add attraction force
+                force = attraction([i, j], goal, alpha)
+                print("attractive", force)
+                
+                for (oi, oj) in zip(obs_i, obs_j):
+                    if np.linalg.norm(np.array([i, j]) - np.array([oi, oj])) < q_max:
+                        # add replusion force
+                        if i != oi and j != oj:
+                            r_force = repulsion([i, j], [oi, oj], beta, q_max)
+                            force[0] = force[0] - r_force[0]
+                            force[1] = force[1] - r_force[1]
+                            print("i:", i, " j:", j)
+                            print("oi:", oi, " oj:", oj)
+                            print("repulsive", r_force)
+                        #pass
+
+                print("force", force)
+                x.append(i)
+                y.append(j)
+                fx.append(force[0])
+                fy.append(force[1])
+
+    return x, y, fx, fy
+
+def parse_text(str):
+    alph = ['1','2','3','4','5','6','7','8','9','0','.','-']
+    new_s = ''
+    float_list = []
+    for c in range(len(str)):
+        if str[c] in alph:
+            new_s += str[c]
+        else:
+            if len(new_s) > 1:
+                float_list.append(float(new_s))
+                new_s = ''
+
+    return (float_list[0], float_list[1])
+
+def is_colinear(p1, p2, p3, epsilon = 1e-6):
+    m = np.concatenate((p1, p2, p3), 0)
+    det = np.linalg.det(m)
+    return abs(det) < epsilon 
+
+def point(p):
+    return np.array([p[0], p[1], 1.]).reshape(1, -1)
+
+def prune_path(path, grid):
+    new_path = [p for p in path]
+
+    i = 0
+    while i < len(new_path) - 2:
+
+        #prune path for extraneous diagonals
+        p1 = new_path[i]
+        p2 = new_path[i+1]
+        p3 = new_path[i+2]
+
+        cells = list(bresenham(p1[0], p1[1], p3[0], p3[1]))
+
+        hits = False
+        #print("*******************")
+        #print(cells)
+        #print() 
+        for c in cells:
+            #print(c)
+            #print(grid[c[0]][c[1]])
+            if grid[c[0]][c[1]] == 1:
+                hits = True
+            
+
+        p1 = point(p1)
+        p2 = point(p2)
+        p3 = point(p3)
+
+        #prune path for colinear points
+        if is_colinear(p1, p2, p3):
+            new_path.remove(new_path[i+1])
+
+        elif not hits:
+            new_path.remove(new_path[i+1])
+
+        else:
+            i += 1
+    return new_path
+
 
