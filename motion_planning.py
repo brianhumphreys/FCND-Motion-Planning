@@ -127,39 +127,40 @@ class MotionPlanning(Drone):
             lat, lon = parse_text(first_line)
 
         print("lat, lon", lat, lon)
-        
+
         # TODO: set home position to (lon0, lat0, 0)
         global_home = (lon, lat, 0)
         self.set_home_position(lon, lat, 0)
 
         # TODO: retrieve current global position
         global_position = self.global_position
- 
+
         # TODO: convert to current local position using global_to_local()
 
         local_position = global_to_local(global_position, global_home)
         print(local_position)
-        
+
         print('global home {0}, position {1}, local position {2}'.format(self.global_home, self.global_position,
                                                                          self.local_position))
         # Read in obstacle map
         data = np.loadtxt('colliders.csv', delimiter=',', dtype='Float64', skiprows=2)
-        
+
         # Define a grid for a particular altitude and safety margin around obstacles
         grid, north_offset, east_offset = create_grid(data, TARGET_ALTITUDE, SAFETY_DISTANCE)
         print("North offset = {0}, east offset = {1}".format(north_offset, east_offset))
-        
+
         # TODO: convert start position to current position rather than map center
         grid_start = (-north_offset + int(local_position[1]), -east_offset + int(local_position[0]))
         #grid_start = (-north_offset + int(local_position[1]), -east_offset + int(local_position[0]))
-        
+
         # TODO: adapt to set goal as latitude / longitude position and convert
-        
-        
+
+
         ###MULTIPLE CHECKPOINT ASTAR###
 
         waypoints = []
-        checkpoint = [(-122.400765, 37.796095, TARGET_ALTITUDE), (global_home[0], global_home[1], TARGET_ALTITUDE)]
+        print('###################', args.latlon)
+        checkpoint = [(args.latlon[0], args.latlon[1], TARGET_ALTITUDE), (global_home[0], global_home[1], TARGET_ALTITUDE)]
         for global_goal in checkpoint:
             grid_goal = global_to_local(global_goal, global_home)
             grid_goal = (-north_offset + int(grid_goal[1]), -east_offset + int(grid_goal[0]))
@@ -206,9 +207,11 @@ class MotionPlanning(Drone):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('latlon', metavar='N', type=float, nargs='+', help='coordinates to set as a goal position')
     parser.add_argument('--port', type=int, default=5760, help='Port number')
     parser.add_argument('--host', type=str, default='127.0.0.1', help="host address, i.e. '127.0.0.1'")
     args = parser.parse_args()
+    print('###################', args.latlon)
 
     conn = MavlinkConnection('tcp:{0}:{1}'.format(args.host, args.port), timeout=60)
     drone = MotionPlanning(conn)
